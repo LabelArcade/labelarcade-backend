@@ -34,4 +34,13 @@ Object.keys(db).forEach(modelName => {
 db.sequelize = sequelize;
 db.Sequelize = Sequelize;
 
+// ✅ Automatically sync models to DB on startup (you can remove after first deploy)
+sequelize.sync()
+  .then(() => {
+    console.log('✅ Database synchronized successfully');
+  })
+  .catch(err => {
+    console.error('❌ Database synchronization error:', err);
+  });
+
 module.exports = db;
