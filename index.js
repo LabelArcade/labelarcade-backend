@@ -12,24 +12,14 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 const { TII_API_KEY, TII_API_BASE, JWT_SECRET } = process.env;
 
-// Verify Environment Variables
-if (!TII_API_KEY || !TII_API_BASE || !JWT_SECRET) {
-  console.error("❌ Environment variables not properly configured.");
-  process.exit(1);
-}
-
-// SSL Agent - Dev Only
+// SSL Agent (Dev Only)
 const httpsAgent = new https.Agent({ rejectUnauthorized: false });
 
-// ============================
 // MIDDLEWARES
-// ============================
 app.use(cors());
 app.use(express.json());
 
-// ============================
 // AUTHENTICATION MIDDLEWARE
-// ============================
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -50,19 +40,13 @@ const authenticateToken = (req, res, next) => {
   }
 };
 
-// ============================
-// AUTHENTICATION ROUTES
-// ============================
-
-// Register User
+// AUTH ROUTES
 app.post('/api/auth/register', async (req, res) => {
   const { username, email, password } = req.body;
 
   try {
     const existingUser = await User.findOne({ where: { email } });
-    if (existingUser) {
-      return res.status(400).json({ error: 'User already exists' });
-    }
+    if (existingUser) return res.status(400).json({ error: 'User already exists' });
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = await User.create({ username, email, password: hashedPassword });
@@ -75,20 +59,15 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-// Login User
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
 
   try {
     const user = await User.findOne({ where: { email } });
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+    if (!user) return res.status(404).json({ error: 'User not found' });
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      return res.status(401).json({ error: 'Invalid password' });
-    }
+    if (!isPasswordValid) return res.status(401).json({ error: 'Invalid password' });
 
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '3h' });
     console.log('✅ JWT Token Generated for User:', user.id);
@@ -100,21 +79,14 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// ============================
-// PROTECTED ROUTES
-// ============================
-
-// Fetch User Profile
+// USER PROFILE
 app.get('/api/user/profile', authenticateToken, async (req, res) => {
   try {
     const user = await User.findByPk(req.user.userId, {
       attributes: ['id', 'username', 'email', 'score'],
     });
 
-    if (!user) {
-      return res.status(404).json({ error: 'User not found.' });
-    }
-
+    if (!user) return res.status(404).json({ error: 'User not found.' });
     return res.json(user);
   } catch (err) {
     console.error('❌ Profile fetch error:', err.message);
@@ -122,7 +94,7 @@ app.get('/api/user/profile', authenticateToken, async (req, res) => {
   }
 });
 
-// Fetch Next Task
+// FETCH TASK FROM TII
 app.get('/api/tasks/next', authenticateToken, async (req, res) => {
   const apiKey = req.headers['x-api-key'];
   console.log('🔗 Received API Key:', apiKey);
@@ -145,20 +117,26 @@ app.get('/api/tasks/next', authenticateToken, async (req, res) => {
 
     console.log('✅ Task Data Fetched:', response.data);
     return res.json(response.data);
-
   } catch (err) {
     console.error('❌ Task Fetching Error:', err.response?.data || err.message);
     return res.status(500).json({ error: 'Failed to fetch task' });
   }
 });
 
-// Submit task to TII from backend
+// SUBMIT TASK TO TII + STORE LOCALLY
 app.post('/api/tasks/:track_id/submit', authenticateToken, async (req, res) => {
   const { track_id } = req.params;
-  const { answer, taskId } = req.body;
+  const { taskId, answer, timeTakenInSeconds } = req.body;
 
-  if (!track_id || !answer || !taskId) {
-    return res.status(400).json({ error: 'Missing track_id, answer, or taskId' });
+  console.log("🚀 [SUBMIT API CALLED]");
+  console.log("📌 track_id:", track_id);
+  console.log("📌 taskId:", taskId);
+  console.log("📌 answer:", answer);
+  console.log("📌 timeTakenInSeconds:", timeTakenInSeconds);
+
+  if (!track_id || !taskId || !answer) {
+    console.error("❌ Missing required submission fields");
+    return res.status(400).json({ error: 'Missing track_id, taskId, or answer' });
   }
 
   try {
@@ -173,28 +151,26 @@ app.post('/api/tasks/:track_id/submit', authenticateToken, async (req, res) => {
           'x-api-key': TII_API_KEY,
           'Content-Type': 'application/x-www-form-urlencoded'
         },
-        httpsAgent // only for local development; safe to keep here
+        httpsAgent
       }
     );
 
-    // Save locally (optional)
-   await Submission.create({
-  userId: req.user.userId,
-  taskId,
-  answer,
-  timeTakenInSeconds: req.body.timeTakenInSeconds || null
-});
+    await Submission.create({
+      userId: req.user.userId,
+      taskId,
+      answer,
+      timeTakenInSeconds: timeTakenInSeconds || null
+    });
 
-// ✅ Score update based on confidence
-const confidence = parseFloat(submissionResponse.data?.confidence);
-if (!isNaN(confidence) && confidence >= 0.9) {
-  await User.increment('score', { by: 10, where: { id: req.user.userId } });
-  console.log(`🏆 User ${req.user.userId} earned 10 points for high confidence (${confidence})`);
-}
+    const confidence = parseFloat(submissionResponse.data?.confidence);
+    if (!isNaN(confidence) && confidence >= 0.9) {
+      await User.increment('score', { by: 10, where: { id: req.user.userId } });
+      console.log(`🏆 User ${req.user.userId} earned 10 points (confidence: ${confidence})`);
+    }
 
     console.log('✅ Submitted to TII & saved locally:', submissionResponse.data);
-
     return res.json(submissionResponse.data);
+
   } catch (err) {
     console.error('❌ Submission to TII failed:', err.response?.data || err.message);
     return res.status(500).json({
@@ -204,18 +180,14 @@ if (!isNaN(confidence) && confidence >= 0.9) {
   }
 });
 
-// ============================
-// LEADERBOARD ENDPOINT
-// ============================
-
+// LEADERBOARD
 app.get('/api/leaderboard', async (req, res) => {
   try {
     const topUsers = await User.findAll({
-      attributes: ['id', 'email', 'score'], 
+      attributes: ['id', 'email', 'score'],
       order: [['score', 'DESC']],
       limit: 10
     });
-
     res.json(topUsers);
   } catch (err) {
     console.error('❌ Leaderboard fetch error:', err.message);
@@ -223,18 +195,13 @@ app.get('/api/leaderboard', async (req, res) => {
   }
 });
 
-
-// ============================
-// FETCH SUBMISSION HISTORY
-// ============================
-
+// SUBMISSION HISTORY
 app.get('/api/submissions', authenticateToken, async (req, res) => {
   try {
     const submissions = await Submission.findAll({
       where: { userId: req.user.userId },
       order: [['createdAt', 'DESC']],
     });
-
     res.json(submissions);
   } catch (err) {
     console.error('❌ Error fetching submissions:', err.message);
@@ -242,9 +209,7 @@ app.get('/api/submissions', authenticateToken, async (req, res) => {
   }
 });
 
-// ============================
 // START SERVER
-// ============================
 app.listen(PORT, async () => {
   try {
     await sequelize.authenticate();
