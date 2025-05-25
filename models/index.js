@@ -9,11 +9,23 @@ const config = require(__dirname + '/../config/config.js')[env];
 const db = {};
 
 let sequelize;
-if (config.use_env_variable) {
-  sequelize = new Sequelize(process.env[config.use_env_variable], config);
+
+if (process.env.DATABASE_URL) {
+  // Railway deployment
+  sequelize = new Sequelize(process.env.DATABASE_URL, {
+    dialect: 'postgres',
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false, // Required for Railway's self-signed cert
+      },
+    },
+  });
 } else {
+  // Local development
   sequelize = new Sequelize(config.database, config.username, config.password, config);
 }
+
 
 fs
   .readdirSync(__dirname)
