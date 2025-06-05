@@ -51,8 +51,16 @@ app.post('/api/auth/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = await User.create({ username, email, password: hashedPassword });
 
+    // Generate JWT token for immediate login (mobile support)
+    const token = jwt.sign({ userId: newUser.id }, JWT_SECRET, { expiresIn: '3h' });
+
     console.log('✅ User Registered:', newUser.id);
-    return res.json({ message: 'User registered successfully', userId: newUser.id });
+    return res.json({
+      message: 'User registered successfully',
+      token,
+      userId: newUser.id
+    });
+
   } catch (err) {
     console.error('❌ Registration error:', err.message);
     return res.status(500).json({ error: 'Internal server error' });
@@ -109,7 +117,7 @@ app.get('/api/tasks/next', authenticateToken, async (req, res) => {
 
     const response = await axios.get(url, {
       headers: {
-        'x-api-key': apiKey,
+        'x-api-key': TII_API_KEY,
         'Accept': 'application/json',
       },
       httpsAgent,
