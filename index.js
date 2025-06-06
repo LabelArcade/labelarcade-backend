@@ -52,7 +52,7 @@ app.post('/api/auth/register', async (req, res) => {
     const newUser = await User.create({ username, email, password: hashedPassword });
 
     // Generate JWT token for immediate login (mobile support)
-    const token = jwt.sign({ userId: newUser.id }, JWT_SECRET, { expiresIn: '3h' });
+    const token = jwt.sign({ userId: newUser.id }, JWT_SECRET, { expiresIn: '7d' });
 
     console.log('✅ User Registered:', newUser.id);
     return res.json({
@@ -77,7 +77,7 @@ app.post('/api/auth/login', async (req, res) => {
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) return res.status(401).json({ error: 'Invalid password' });
 
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '3h' });
+    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
     console.log('✅ JWT Token Generated for User:', user.id);
 
     return res.json({ token });
