@@ -7,6 +7,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 const { sequelize, User, Submission } = require('./models');
+const { submitTaskAnswer } = require('./controllers/taskController');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -51,7 +52,6 @@ app.post('/api/auth/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = await User.create({ username, email, password: hashedPassword });
 
-    // Generate JWT token for immediate login (mobile support)
     const token = jwt.sign({ userId: newUser.id }, JWT_SECRET, { expiresIn: '7d' });
 
     console.log('✅ User Registered:', newUser.id);
@@ -87,7 +87,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// USER PROFILE (Updated to include XP and Level)
+// USER PROFILE
 app.get('/api/user/profile', authenticateToken, async (req, res) => {
   try {
     const user = await User.findByPk(req.user.userId, {
@@ -102,7 +102,6 @@ app.get('/api/user/profile', authenticateToken, async (req, res) => {
   }
 });
 
-
 // FETCH TASK FROM TII
 app.get('/api/tasks/next', authenticateToken, async (req, res) => {
   const apiKey = req.headers['x-api-key'];
@@ -114,8 +113,6 @@ app.get('/api/tasks/next', authenticateToken, async (req, res) => {
 
   try {
     const url = `${TII_API_BASE}/tasks/pick?lang=en&category=vqa`;
-    console.log('🔗 Requesting URL:', url);
-
     const response = await axios.get(url, {
       headers: {
         'x-api-key': TII_API_KEY,
@@ -132,74 +129,8 @@ app.get('/api/tasks/next', authenticateToken, async (req, res) => {
   }
 });
 
-// SUBMIT TASK TO TII + STORE LOCALLY
-app.post('/api/tasks/:track_id/submit', authenticateToken, async (req, res) => {
-  const { track_id } = req.params;
-  const { taskId, answer, timeTakenInSeconds } = req.body;
-
-  console.log("🚀 [SUBMIT API CALLED]");
-  console.log("📌 track_id:", track_id);
-  console.log("📌 taskId:", taskId);
-  console.log("📌 answer:", answer);
-  console.log("📌 timeTakenInSeconds:", timeTakenInSeconds);
-
-  if (!track_id || !taskId || !answer) {
-    console.error("❌ Missing required submission fields");
-    return res.status(400).json({ error: 'Missing track_id, taskId, or answer' });
-  }
-
-  try {
-    const submissionResponse = await axios.post(
-      `${TII_API_BASE}/tasks/${taskId}/submit`,
-      new URLSearchParams({
-        track_id,
-        solution: answer
-      }),
-      {
-        headers: {
-          'x-api-key': TII_API_KEY,
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        httpsAgent
-      }
-    );
-
-    await Submission.create({
-      userId: req.user.userId,
-      taskId,
-      answer,
-      timeTakenInSeconds: timeTakenInSeconds || null
-    });
-
-   const confidence = parseFloat(submissionResponse.data?.confidence);
-
-if (!isNaN(confidence) && confidence >= 0.9) {
-  // 🎯 Increase score and XP
-  const user = await User.findByPk(req.user.userId);
-
-  user.score += 10;
-  user.xp += 10;
-
-  // 🧠 Calculate level: every 50 XP = +1 level
-  user.level = Math.floor(user.xp / 50) + 1;
-
-  await user.save();
-
-  console.log(`🏆 User ${user.id} +10 XP → XP: ${user.xp}, Level: ${user.level}`);
-}
-
-
-    console.log('✅ Submitted to TII & saved locally:', submissionResponse.data);
-    return res.json(submissionResponse.data);
-
-  } catch (err) {
-    console.error('❌ Submission to TII failed:', err.response?.data || err.message);
-    return res.status(500).json({
-      error: 'TII submission failed',
-      details: err.response?.data || err.message
-    });
-  }
-});
+// SUBMIT TASK TO TII + STORE LOCALLY (Modular)
+app.post('/api/tasks/:track_id/submit', authenticateToken, submitTaskAnswer);
 
 // LEADERBOARD
 app.get('/api/leaderboard', async (req, res) => {
@@ -207,7 +138,7 @@ app.get('/api/leaderboard', async (req, res) => {
     const topUsers = await User.findAll({
       attributes: ['id', 'email', 'score'],
       order: [['score', 'DESC']],
-      limit: 10
+      limit: 10,
     });
     res.json(topUsers);
   } catch (err) {
