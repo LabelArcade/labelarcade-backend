@@ -170,11 +170,23 @@ app.post('/api/tasks/:track_id/submit', authenticateToken, async (req, res) => {
       timeTakenInSeconds: timeTakenInSeconds || null
     });
 
-    const confidence = parseFloat(submissionResponse.data?.confidence);
-    if (!isNaN(confidence) && confidence >= 0.9) {
-      await User.increment('score', { by: 10, where: { id: req.user.userId } });
-      console.log(`🏆 User ${req.user.userId} earned 10 points (confidence: ${confidence})`);
-    }
+   const confidence = parseFloat(submissionResponse.data?.confidence);
+
+if (!isNaN(confidence) && confidence >= 0.9) {
+  // 🎯 Increase score and XP
+  const user = await User.findByPk(req.user.userId);
+
+  user.score += 10;
+  user.xp += 10;
+
+  // 🧠 Calculate level: every 50 XP = +1 level
+  user.level = Math.floor(user.xp / 50) + 1;
+
+  await user.save();
+
+  console.log(`🏆 User ${user.id} +10 XP → XP: ${user.xp}, Level: ${user.level}`);
+}
+
 
     console.log('✅ Submitted to TII & saved locally:', submissionResponse.data);
     return res.json(submissionResponse.data);
