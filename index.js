@@ -91,7 +91,7 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/user/profile', authenticateToken, async (req, res) => {
   try {
     const user = await User.findByPk(req.user.userId, {
-      attributes: ['id', 'username', 'email', 'score', 'xp', 'level'],
+      attributes: ['id', 'username', 'email', 'score', 'xp', 'level', 'streakCount', 'lastSubmissionDate'],
     });
 
     if (!user) return res.status(404).json({ error: 'User not found.' });
@@ -101,6 +101,7 @@ app.get('/api/user/profile', authenticateToken, async (req, res) => {
     return res.status(500).json({ error: 'Internal server error.' });
   }
 });
+
 
 // FETCH TASK FROM TII
 app.get('/api/tasks/next', authenticateToken, async (req, res) => {

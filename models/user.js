@@ -33,7 +33,7 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: 0,
       },
 
-      // ✅ NEW FIELDS FOR GAMIFICATION
+      // ✅ Existing gamification fields
       xp: {
         type: DataTypes.INTEGER,
         allowNull: false,
@@ -43,6 +43,17 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 1,
+      },
+
+      // ✅ New streak-related fields
+      streakCount: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+      },
+      lastSubmissionDate: {
+        type: DataTypes.DATE,
+        allowNull: true,
       },
     },
     {
