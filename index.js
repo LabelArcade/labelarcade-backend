@@ -1,3 +1,4 @@
+// Updated backend index.js with avatar support in registration
 require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
@@ -13,14 +14,11 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 const { TII_API_KEY, TII_API_BASE, JWT_SECRET } = process.env;
 
-// SSL Agent (Dev Only)
 const httpsAgent = new https.Agent({ rejectUnauthorized: false });
 
-// MIDDLEWARES
 app.use(cors());
 app.use(express.json());
 
-// AUTHENTICATION MIDDLEWARE
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -41,20 +39,20 @@ const authenticateToken = (req, res, next) => {
   }
 };
 
-// AUTH ROUTES
+// Register Route (with avatar support)
 app.post('/api/auth/register', async (req, res) => {
-  const { username, email, password } = req.body;
+  const { username, email, password, avatar } = req.body;
 
   try {
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) return res.status(400).json({ error: 'User already exists' });
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = await User.create({ username, email, password: hashedPassword });
+    const newUser = await User.create({ username, email, password: hashedPassword, avatar });
 
     const token = jwt.sign({ userId: newUser.id }, JWT_SECRET, { expiresIn: '7d' });
-
     console.log('✅ User Registered:', newUser.id);
+
     return res.json({
       message: 'User registered successfully',
       token,
@@ -86,7 +84,6 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// GET USER PROFILE
 app.get('/api/user/profile', authenticateToken, async (req, res) => {
   try {
     const user = await User.findByPk(req.user.userId, {
@@ -104,7 +101,6 @@ app.get('/api/user/profile', authenticateToken, async (req, res) => {
   }
 });
 
-// UPDATE USER PROFILE (username, avatar)
 app.put('/api/user/profile', authenticateToken, async (req, res) => {
   const { username, avatar } = req.body;
 
@@ -116,7 +112,6 @@ app.put('/api/user/profile', authenticateToken, async (req, res) => {
     if (avatar) user.avatar = avatar;
 
     await user.save();
-
     return res.json({ message: 'Profile updated successfully', user });
   } catch (err) {
     console.error('❌ Profile update error:', err.message);
@@ -124,7 +119,6 @@ app.put('/api/user/profile', authenticateToken, async (req, res) => {
   }
 });
 
-// FETCH NEXT TASK
 app.get('/api/tasks/next', authenticateToken, async (req, res) => {
   const apiKey = req.headers['x-api-key'];
   console.log('🔗 Received API Key:', apiKey);
@@ -151,10 +145,8 @@ app.get('/api/tasks/next', authenticateToken, async (req, res) => {
   }
 });
 
-// SUBMIT TASK
 app.post('/api/tasks/:track_id/submit', authenticateToken, submitTaskAnswer);
 
-// LEADERBOARD
 app.get('/api/leaderboard', async (req, res) => {
   try {
     const topUsers = await User.findAll({
@@ -169,7 +161,6 @@ app.get('/api/leaderboard', async (req, res) => {
   }
 });
 
-// SUBMISSION HISTORY
 app.get('/api/submissions', authenticateToken, async (req, res) => {
   try {
     const submissions = await Submission.findAll({
@@ -183,7 +174,6 @@ app.get('/api/submissions', authenticateToken, async (req, res) => {
   }
 });
 
-// START SERVER
 app.listen(PORT, async () => {
   try {
     await sequelize.authenticate();
@@ -191,6 +181,5 @@ app.listen(PORT, async () => {
   } catch (err) {
     console.error('❌ Database connection error:', err.message);
   }
-
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
