@@ -60,7 +60,6 @@ app.post('/api/auth/register', async (req, res) => {
       token,
       userId: newUser.id
     });
-
   } catch (err) {
     console.error('❌ Registration error:', err.message);
     return res.status(500).json({ error: 'Internal server error' });
@@ -87,11 +86,14 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// USER PROFILE
+// GET USER PROFILE
 app.get('/api/user/profile', authenticateToken, async (req, res) => {
   try {
     const user = await User.findByPk(req.user.userId, {
-      attributes: ['id', 'username', 'email', 'score', 'xp', 'level', 'streakCount', 'lastSubmissionDate'],
+      attributes: [
+        'id', 'username', 'email', 'score', 'xp',
+        'level', 'streakCount', 'lastSubmissionDate', 'badges', 'avatar'
+      ],
     });
 
     if (!user) return res.status(404).json({ error: 'User not found.' });
@@ -102,8 +104,27 @@ app.get('/api/user/profile', authenticateToken, async (req, res) => {
   }
 });
 
+// UPDATE USER PROFILE (username, avatar)
+app.put('/api/user/profile', authenticateToken, async (req, res) => {
+  const { username, avatar } = req.body;
 
-// FETCH TASK FROM TII
+  try {
+    const user = await User.findByPk(req.user.userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    if (username) user.username = username;
+    if (avatar) user.avatar = avatar;
+
+    await user.save();
+
+    return res.json({ message: 'Profile updated successfully', user });
+  } catch (err) {
+    console.error('❌ Profile update error:', err.message);
+    return res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
+// FETCH NEXT TASK
 app.get('/api/tasks/next', authenticateToken, async (req, res) => {
   const apiKey = req.headers['x-api-key'];
   console.log('🔗 Received API Key:', apiKey);
@@ -130,7 +151,7 @@ app.get('/api/tasks/next', authenticateToken, async (req, res) => {
   }
 });
 
-// SUBMIT TASK TO TII + STORE LOCALLY (Modular)
+// SUBMIT TASK
 app.post('/api/tasks/:track_id/submit', authenticateToken, submitTaskAnswer);
 
 // LEADERBOARD
