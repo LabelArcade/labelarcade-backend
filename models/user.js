@@ -33,7 +33,7 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: 0,
       },
 
-      // ✅ Existing gamification fields
+      // ✅ Gamification Fields
       xp: {
         type: DataTypes.INTEGER,
         allowNull: false,
@@ -44,8 +44,6 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: 1,
       },
-
-      // ✅ New streak-related fields
       streakCount: {
         type: DataTypes.INTEGER,
         allowNull: false,
@@ -54,6 +52,17 @@ module.exports = (sequelize, DataTypes) => {
       lastSubmissionDate: {
         type: DataTypes.DATE,
         allowNull: true,
+      },
+
+      // ✅ New Fields for Avatar & Badges
+      avatar: {
+        type: DataTypes.STRING,
+        allowNull: true, // can be null initially
+      },
+      badges: {
+        type: DataTypes.ARRAY(DataTypes.STRING),
+        allowNull: false,
+        defaultValue: [],
       },
     },
     {
