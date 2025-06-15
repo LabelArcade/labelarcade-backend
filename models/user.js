@@ -32,8 +32,6 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: 0,
       },
-
-      // ✅ Gamification Fields
       xp: {
         type: DataTypes.INTEGER,
         allowNull: false,
@@ -53,16 +51,19 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DATE,
         allowNull: true,
       },
-
-      // ✅ New Fields for Avatar & Badges
       avatar: {
         type: DataTypes.STRING,
-        allowNull: true, // can be null initially
+        allowNull: true,
       },
       badges: {
         type: DataTypes.ARRAY(DataTypes.STRING),
         allowNull: false,
         defaultValue: [],
+        get() {
+          const raw = this.getDataValue('badges');
+          if (!Array.isArray(raw)) return [];
+          return raw;
+        },
       },
     },
     {

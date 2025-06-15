@@ -57,17 +57,26 @@ exports.submitTaskAnswer = async (req, res) => {
         user.lastSubmissionDate = new Date();
       }
 
-      // ✅ Badge logic
-      const unlockedBadges = [];
-      const badges = Array.isArray(user.badges) ? user.badges : [];
+      // ✅ Badge logic (safe JSON array fallback)
+      let badges = [];
+      try {
+        if (typeof user.badges === 'string') {
+          badges = JSON.parse(user.badges);
+        } else if (Array.isArray(user.badges)) {
+          badges = user.badges;
+        }
+      } catch (e) {
+        badges = [];
+      }
 
+      const unlockedBadges = [];
       if (!badges.includes('first_task')) unlockedBadges.push('first_task');
       if (!badges.includes('streak_3') && user.streakCount >= 3) unlockedBadges.push('streak_3');
       if (!badges.includes('level_5') && user.level >= 5) unlockedBadges.push('level_5');
 
       if (unlockedBadges.length > 0) {
         user.badges = [...badges, ...unlockedBadges];
-        newBadge = unlockedBadges[0]; // Only send one badge to trigger UI
+        newBadge = unlockedBadges[0];
       }
 
       await user.save();
