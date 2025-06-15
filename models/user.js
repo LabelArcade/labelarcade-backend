@@ -56,14 +56,9 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
       },
       badges: {
-        type: DataTypes.ARRAY(DataTypes.STRING),
+        type: DataTypes.JSON, 
         allowNull: false,
         defaultValue: [],
-        get() {
-          const raw = this.getDataValue('badges');
-          if (!Array.isArray(raw)) return [];
-          return raw;
-        },
       },
     },
     {
